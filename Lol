@@ -1,0 +1,195 @@
+-- // TITLE: Dynamic Diagnostic Console Panel
+-- // CONFIG: Compiled and configured for Developer: Azar
+-- // DESCRIPTION: Self-mounting execution structure to bypass rendering blockages.
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- // 1. CRITICAL CONTAINER RESOLUTION
+local PlayerGui = nil
+do
+	local loops = 0
+	while not PlayerGui and loops < 500 do
+		PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+		if not PlayerGui then
+			task.wait(0.05)
+			loops = loops + 1
+		end
+	end
+end
+
+if not PlayerGui then
+	warn("[FATAL ENGINE ERROR] Unable to resolve PlayerGui directory after timeout.")
+	return
+end
+
+-- // 2. SYSTEM CONFIGURATION MATRIX
+local SystemsConfig = {
+	MasterActive = false,
+	TargetLockActive = false,
+	AimModeActive = false,
+	AutoPlayActive = false,
+	
+	TrackingRange = 200,
+	CameraSmoothness = 1.0, -- Set to 1.0 for instant hardware camera snapping
+	TargetBone = "Head"
+}
+
+-- // 3. INTERFACE BUILDER (BY AZAR)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AzarDevSystemEngine"
+ScreenGui.ResetOnSpawn = false -- CRITICAL: Prevents the UI from self-destructing when you die
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+ScreenGui.Parent = PlayerGui
+
+-- Base Frame
+local BasePanel = Instance.new("Frame")
+BasePanel.Name = "MainConsoleCanvas"
+BasePanel.Size = UDim2.new(0, 280, 0, 360)
+BasePanel.Position = UDim2.new(0.05, 0, 0.25, 0)
+BasePanel.BackgroundColor3 = Color3.fromRGB(24, 24, 28)
+BasePanel.BorderSizePixel = 0
+BasePanel.Active = true
+BasePanel.Draggable = true -- Allows manual movement on screen
+BasePanel.Parent = ScreenGui
+
+local PanelCorner = Instance.new("UICorner")
+PanelCorner.CornerRadius = UDim.new(0, 6)
+PanelCorner.Parent = BasePanel
+
+local PanelStroke = Instance.new("UIStroke")
+PanelStroke.Color = Color3.fromRGB(0, 170, 255)
+PanelStroke.Thickness = 1.5
+PanelStroke.Parent = BasePanel
+
+-- Title Header
+local Header = Instance.new("TextLabel")
+Header.Name = "TitleHeader"
+Header.Size = UDim2.new(1, 0, 0, 40)
+Header.BackgroundColor3 = Color3.fromRGB(32, 32, 38)
+Header.Text = "   AZAR DEV ENGINE v2.0"
+Header.TextColor3 = Color3.fromRGB(255, 255, 255)
+Header.Font = Enum.Font.SourceSansBold
+Header.TextSize = 14
+Header.TextXAlignment = Enum.TextXAlignment.Left
+Header.Parent = BasePanel
+
+local HeaderCorner = Instance.new("UICorner")
+HeaderCorner.CornerRadius = UDim.new(0, 6)
+HeaderCorner.Parent = Header
+
+-- Modular Component Factory Function
+local function CompileButton(name, defaultText, positionY)
+	local NewButton = Instance.new("TextButton")
+	NewButton.Name = name .. "Control"
+	NewButton.Size = UDim2.new(0, 240, 0, 35)
+	NewButton.Position = UDim2.new(0, 20, 0, positionY)
+	NewButton.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+	NewButton.Text = defaultText
+	NewButton.TextColor3 = Color3.fromRGB(230, 230, 230)
+	NewButton.Font = Enum.Font.SourceSansSemibold
+	NewButton.TextSize = 13
+	NewButton.Parent = BasePanel
+	
+	local BtnCorner = Instance.new("UICorner")
+	BtnCorner.CornerRadius = UDim.new(0, 4)
+	BtnCorner.Parent = NewButton
+	
+	local BtnStroke = Instance.new("UIStroke")
+	BtnStroke.Color = Color3.fromRGB(55, 55, 60)
+	BtnStroke.Thickness = 1
+	BtnStroke.Parent = NewButton
+	
+	return NewButton
+end
+
+-- Generate Interface Elements
+local MasterToggleBtn = CompileButton("Master", "MASTER CORE: DISABLED", 60)
+local TargetLockBtn   = CompileButton("TargetLock", "TARGET LOCK: OFF", 110)
+local AimModeBtn      = CompileButton("AimMode", "AIMBOT SIMULATOR: OFF", 160)
+local FovLabel        = CompileButton("FovDisplay", "FOV TRACKING RADIUS: 200 STUDS", 210)
+local SmoothnessLabel = CompileButton("SmoothDisplay", "SNAP SPEED: INSTANT (1.0)", 260)
+local AutoPlayBtn     = CompileButton("AutoPlay", "AUTOPLAY NAVIGATION: DISABLED", 310)
+
+-- // 4. INTERACTION EVENT WIREUP
+local function UpdateButtonVisual(buttonObject, condition, trueText, falseText)
+	if condition then
+		buttonObject.Text = trueText
+		buttonObject.BackgroundColor3 = Color3.fromRGB(0, 145, 90)
+	else
+		buttonObject.Text = falseText
+		buttonObject.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+	end
+end
+
+MasterToggleBtn.MouseButton1Click:Connect(function()
+	SystemsConfig.MasterActive = not SystemsConfig.MasterActive
+	UpdateButtonVisual(MasterToggleBtn, SystemsConfig.MasterActive, "MASTER CORE: ENABLED", "MASTER CORE: DISABLED")
+end)
+
+TargetLockBtn.MouseButton1Click:Connect(function()
+	SystemsConfig.TargetLockActive = not SystemsConfig.TargetLockActive
+	UpdateButtonVisual(TargetLockBtn, SystemsConfig.TargetLockActive, "TARGET LOCK: ON", "TARGET LOCK: OFF")
+end)
+
+AimModeBtn.MouseButton1Click:Connect(function()
+	SystemsConfig.AimModeActive = not SystemsConfig.AimModeActive
+	UpdateButtonVisual(AimModeBtn, SystemsConfig.AimModeActive, "AIMBOT SIMULATOR: ACTIVE", "AIMBOT SIMULATOR: OFF")
+end)
+
+AutoPlayBtn.MouseButton1Click:Connect(function()
+	SystemsConfig.AutoPlayActive = not SystemsConfig.AutoPlayActive
+	UpdateButtonVisual(AutoPlayBtn, SystemsConfig.AutoPlayActive, "AUTOPLAY NAVIGATION: RUNNING", "AUTOPLAY NAVIGATION: DISABLED")
+end)
+
+-- // 5. MATHEMATICAL TARGET SELECTION FUNCTION
+local function ScanForNearestTargetPart()
+	local localCharacter = LocalPlayer.Character
+	if not localCharacter or not localCharacter:FindFirstChild("HumanoidRootPart") then return nil end
+	
+	local closestPart = nil
+	local shortestDistance = SystemsConfig.TrackingRange
+	local originPosition = localCharacter.HumanoidRootPart.Position
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player ~= LocalPlayer and player.Character then
+			local characterModel = player.Character
+			local humanoid = characterModel:FindFirstChildOfClass("Humanoid")
+			local bonePart = characterModel:FindFirstChild(SystemsConfig.TargetBone) or characterModel:FindFirstChild("HumanoidRootPart")
+			
+			if bonePart and humanoid and humanoid.Health > 0 then
+				local currentDistance = (bonePart.Position - originPosition).Magnitude
+				if currentDistance < shortestDistance then
+					shortestDistance = currentDistance
+					closestPart = bonePart
+				end
+			end
+		end
+	end
+	return closestPart
+end
+
+-- // 6. FRAME CYCLE COMPUTATION LOOP
+RunService.RenderStepped:Connect(function()
+	Camera = Workspace.CurrentCamera
+	
+	-- Only pass math vectors if both the overall engine frame and individual parameters are active
+	if not SystemsConfig.MasterActive then return end
+	
+	local validTarget = ScanForNearestTargetPart()
+	
+	if validTarget and Camera then
+		-- Process camera frame adjustments standardly if TargetLock or AimMode options are verified
+		if SystemsConfig.TargetLockActive or SystemsConfig.AimModeActive then
+			local lookAngle = CFrame.lookAt(Camera.CFrame.Position, validTarget.Position)
+			Camera.CFrame = Camera.CFrame:Lerp(lookAngle, SystemsConfig.CameraSmoothness)
+		end
+	end
+end)
+
+print("[ENGINE] Compilation completely loaded for Developer: Azar.")
